@@ -218,6 +218,7 @@ func fillInDevicesAndServerMap(crypto Crypto, newIndex int,
 // in the provided lists has complete TLF crypt key info, and uses the
 // new ephemeral key pair to generate the info if it doesn't yet
 // exist.
+// MDv3 TODO: get rid of this as it's only used in tests right now.
 func fillInDevices(crypto Crypto,
 	wkb *TLFWriterKeyBundle, rkb *TLFReaderKeyBundle,
 	wKeys map[keybase1.UID][]CryptPublicKey,

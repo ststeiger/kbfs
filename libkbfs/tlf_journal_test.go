@@ -143,7 +143,8 @@ func (c testTLFJournalConfig) checkMD(rmds *RootMetadataSigned,
 	checkBRMD(c.t, uid, verifyingKey, c.Codec(), c.Crypto(),
 		rmds.MD, expectedRevision, expectedPrevRoot,
 		expectedMergeStatus, expectedBranchID)
-	err := rmds.IsValidAndSigned(c.Codec(), c.Crypto())
+	// XXX TODO: pass key bundles
+	err := rmds.IsValidAndSigned(c.Codec(), c.Crypto(), nil, nil)
 	require.NoError(c.t, err)
 	err = rmds.IsLastModifiedBy(uid, verifyingKey)
 	require.NoError(c.t, err)
@@ -428,7 +429,8 @@ type hangingMDServer struct {
 }
 
 func (md hangingMDServer) Put(
-	ctx context.Context, rmds *RootMetadataSigned) error {
+	ctx context.Context, rmds *RootMetadataSigned,
+	_ *TLFWriterKeyBundleV2, _ *TLFReaderKeyBundle) error {
 	close(md.onPutCh)
 	// Hang until the context is cancelled.
 	<-ctx.Done()
@@ -520,7 +522,8 @@ func (s *shimMDServer) GetRange(
 }
 
 func (s *shimMDServer) Put(
-	ctx context.Context, rmds *RootMetadataSigned) error {
+	ctx context.Context, rmds *RootMetadataSigned,
+	_ *TLFWriterKeyBundleV2, _ *TLFReaderKeyBundle) error {
 	if s.nextErr != nil {
 		err := s.nextErr
 		s.nextErr = nil

@@ -106,6 +106,10 @@ type RootMetadata struct {
 	// The TLF handle for this MD. May be nil if this object was
 	// deserialized (more common on the server side).
 	tlfHandle *TlfHandle
+
+	// Cached key bundles when using v3 metadata.
+	cachedWkb *TLFWriterKeyBundleV2
+	cachedRkb *TLFReaderKeyBundle
 }
 
 var _ KeyMetadata = (*RootMetadata)(nil)
@@ -131,15 +135,23 @@ func (md *RootMetadata) clearLastRevision() {
 	md.clearWriterMetadataCopiedBit()
 }
 
-func (md *RootMetadata) deepCopy(codec Codec, copyHandle bool) (*RootMetadata, error) {
+func (md *RootMetadata) makeSuccessor(codec Codec) (*RootMetadata, error) {
 	var newMd RootMetadata
-	if err := md.deepCopyInPlace(codec, copyHandle, &newMd); err != nil {
+	if err := md.deepCopyInPlace(codec, true, true, &newMd); err != nil {
 		return nil, err
 	}
 	return &newMd, nil
 }
 
-func (md *RootMetadata) deepCopyInPlace(codec Codec, copyHandle bool,
+func (md *RootMetadata) deepCopy(codec Codec, copyHandle bool) (*RootMetadata, error) {
+	var newMd RootMetadata
+	if err := md.deepCopyInPlace(codec, copyHandle, false, &newMd); err != nil {
+		return nil, err
+	}
+	return &newMd, nil
+}
+
+func (md *RootMetadata) deepCopyInPlace(codec Codec, copyHandle, successorCopy bool,
 	newMd *RootMetadata) error {
 	if err := CodecUpdate(codec, newMd, md); err != nil {
 		return err
@@ -147,8 +159,13 @@ func (md *RootMetadata) deepCopyInPlace(codec Codec, copyHandle bool,
 	if err := CodecUpdate(codec, &newMd.data, md.data); err != nil {
 		return err
 	}
-
-	brmdCopy, err := md.bareMd.DeepCopy(codec)
+	var err error
+	var brmdCopy BareRootMetadata
+	if successorCopy {
+		brmdCopy, err = md.bareMd.MakeSuccessor(codec)
+	} else {
+		brmdCopy, err = md.bareMd.DeepCopy(codec)
+	}
 	if err != nil {
 		return err
 	}
@@ -179,7 +196,7 @@ func (md *RootMetadata) MakeSuccessor(
 	if md.IsFinal() {
 		return nil, MetadataIsFinalError{}
 	}
-	newMd, err := md.deepCopy(config.Codec(), true)
+	newMd, err := md.makeSuccessor(config.Codec())
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +248,7 @@ func (md *RootMetadata) MakeBareTlfHandle() (BareTlfHandle, error) {
 		panic(errors.New("MakeBareTlfHandle called when md.tlfHandle exists"))
 	}
 
-	return md.bareMd.MakeBareTlfHandle()
+	return md.bareMd.MakeBareTlfHandle(md.cachedWkb, md.cachedRkb)
 }
 
 // IsInitialized returns whether or not this RootMetadata has been initialized
@@ -311,7 +328,7 @@ func (md *RootMetadata) updateFromTlfHandle(newHandle *TlfHandle) error {
 	md.SetConflictInfo(newHandle.ConflictInfo())
 	md.SetFinalizedInfo(newHandle.FinalizedInfo())
 
-	bareHandle, err := md.bareMd.MakeBareTlfHandle()
+	bareHandle, err := md.bareMd.MakeBareTlfHandle(md.cachedWkb, md.cachedRkb)
 	if err != nil {
 		return err
 	}
@@ -347,7 +364,7 @@ func (md *RootMetadata) GetTLFCryptKeyParams(
 	keyGen KeyGen, user keybase1.UID, key CryptPublicKey) (
 	TLFEphemeralPublicKey, EncryptedTLFCryptKeyClientHalf,
 	TLFCryptKeyServerHalfID, bool, error) {
-	return md.bareMd.GetTLFCryptKeyParams(keyGen, user, key)
+	return md.bareMd.GetTLFCryptKeyParams(keyGen, user, key, md.cachedWkb, md.cachedRkb)
 }
 
 // LatestKeyGeneration wraps the respective method of the underlying BareRootMetadata for convenience.
@@ -570,12 +587,14 @@ func (md *RootMetadata) SetTlfID(tlf TlfID) {
 
 // HasKeyForUser wraps the respective method of the underlying BareRootMetadata for convenience.
 func (md *RootMetadata) HasKeyForUser(keyGen KeyGen, user keybase1.UID) bool {
-	return md.bareMd.HasKeyForUser(keyGen, user)
+	return md.bareMd.HasKeyForUser(keyGen, user, md.cachedWkb, md.cachedRkb)
 }
 
 // FakeInitialRekey wraps the respective method of the underlying BareRootMetadata for convenience.
-func (md *RootMetadata) FakeInitialRekey(h BareTlfHandle) {
-	md.bareMd.FakeInitialRekey(h)
+func (md *RootMetadata) FakeInitialRekey(codec Codec, h BareTlfHandle) error {
+	var err error
+	md.cachedWkb, md.cachedRkb, err = md.bareMd.FakeInitialRekey(codec, h)
+	return err
 }
 
 // Update wraps the respective method of the underlying BareRootMetadata for convenience.
@@ -586,6 +605,33 @@ func (md *RootMetadata) Update(id TlfID, h BareTlfHandle) error {
 // GetBareRootMetadata returns an interface to the underlying serializeable metadata.
 func (md *RootMetadata) GetBareRootMetadata() BareRootMetadata {
 	return md.bareMd
+}
+
+// NewKeyGeneration adds a new key generation to this revision of metadata.
+func (md *RootMetadata) NewKeyGeneration(pubKey TLFPublicKey) {
+	md.cachedWkb, md.cachedRkb = md.bareMd.NewKeyGeneration(pubKey)
+}
+
+func (md *RootMetadata) fillInDevices(crypto Crypto,
+	keyGen KeyGen, wKeys map[keybase1.UID][]CryptPublicKey,
+	rKeys map[keybase1.UID][]CryptPublicKey, ePubKey TLFEphemeralPublicKey,
+	ePrivKey TLFEphemeralPrivateKey, tlfCryptKey TLFCryptKey) (serverKeyMap, error) {
+	var err error
+	var wkb *TLFWriterKeyBundle
+
+	// v3 bundles aren't embedded.
+	wkb2, rkb := md.cachedWkb, md.cachedRkb
+	if wkb2 == nil {
+		// v1 & v2 bundles are embedded.
+		wkb, rkb, err = md.bareMd.GetTLFKeyBundles(keyGen)
+		if err != nil {
+			return serverKeyMap{}, err
+		}
+	}
+
+	return md.bareMd.fillInDevices(crypto,
+		wkb, wkb2, rkb, wKeys, rKeys,
+		ePubKey, ePrivKey, tlfCryptKey)
 }
 
 // A ReadOnlyRootMetadata is a thin wrapper around a
@@ -724,14 +770,14 @@ func (rmds *RootMetadataSigned) MakeFinalCopy(config Config) (
 // validated, either by comparing to the current device key (using
 // IsLastModifiedBy), or by checking with KBPKI.
 func (rmds *RootMetadataSigned) IsValidAndSigned(
-	codec Codec, crypto cryptoPure) error {
+	codec Codec, crypto cryptoPure, wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) error {
 	// Optimization -- if the RootMetadata signature is nil, it
 	// will fail verification.
 	if rmds.SigInfo.IsNil() {
 		return errors.New("Missing RootMetadata signature")
 	}
 
-	err := rmds.MD.IsValidAndSigned(codec, crypto)
+	err := rmds.MD.IsValidAndSigned(codec, crypto, wkb, rkb)
 	if err != nil {
 		return err
 	}
@@ -795,12 +841,21 @@ func DecodeRootMetadataSigned(codec Codec, tlf TlfID, ver, max MetadataVer, buf 
 	} else if ver > max {
 		return nil, NewMetadataVersionError{tlf, ver}
 	}
-	// For now only v1 & v2 are supported (both by the same BareRootMetadataSignedV2 struct)
-	if ver > InitialExtraMetadataVer {
+	if ver > SegregatedKeyBundlesVer {
 		// Shouldn't be possible at the moment.
 		panic("Invalid metadata version")
 	}
-	var brmds BareRootMetadataSignedV2
+	if ver < SegregatedKeyBundlesVer {
+		var brmds BareRootMetadataSignedV2
+		if err := codec.Decode(buf, &brmds); err != nil {
+			return nil, err
+		}
+		return &RootMetadataSigned{
+			MD:      &brmds.MD,
+			SigInfo: brmds.SigInfo,
+		}, nil
+	}
+	var brmds BareRootMetadataSignedV3
 	if err := codec.Decode(buf, &brmds); err != nil {
 		return nil, err
 	}
