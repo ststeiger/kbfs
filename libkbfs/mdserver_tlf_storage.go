@@ -197,15 +197,14 @@ func (s *mdServerTlfStorage) getHeadForTLFReadLocked(bid BranchID) (
 }
 
 func (s *mdServerTlfStorage) checkGetParamsReadLocked(
-	currentUID keybase1.UID, bid BranchID,
-	rkb *TLFReaderKeyBundle, wkb *TLFWriterKeyBundleV2) error {
+	currentUID keybase1.UID, bid BranchID, extra ExtraMetadata) error {
 	mergedMasterHead, err := s.getHeadForTLFReadLocked(NullBranchID)
 	if err != nil {
 		return MDServerError{err}
 	}
 
 	if mergedMasterHead != nil {
-		ok, err := isReader(currentUID, mergedMasterHead.MD, wkb, rkb)
+		ok, err := isReader(currentUID, mergedMasterHead.MD, extra)
 		if err != nil {
 			return MDServerError{err}
 		}
@@ -221,7 +220,7 @@ func (s *mdServerTlfStorage) getRangeReadLocked(
 	currentUID keybase1.UID, bid BranchID, start, stop MetadataRevision) (
 	[]*RootMetadataSigned, error) {
 	// MDv3 TODO: pass actual key bundles
-	err := s.checkGetParamsReadLocked(currentUID, bid, nil, nil)
+	err := s.checkGetParamsReadLocked(currentUID, bid, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +285,7 @@ func (s *mdServerTlfStorage) getForTLF(
 	}
 
 	// MDv3 TODO: pass actual key bundles
-	err := s.checkGetParamsReadLocked(currentUID, bid, nil, nil)
+	err := s.checkGetParamsReadLocked(currentUID, bid, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +322,7 @@ func (s *mdServerTlfStorage) put(
 	}
 
 	// MDv3 TODO: pass key bundles
-	err = rmds.IsValidAndSigned(s.codec, s.crypto, nil, nil)
+	err = rmds.IsValidAndSigned(s.codec, s.crypto, nil)
 	if err != nil {
 		return false, MDServerErrorBadRequest{Reason: err.Error()}
 	}

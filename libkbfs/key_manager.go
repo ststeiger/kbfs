@@ -504,7 +504,8 @@ func (km *KeyManagerStandard) Rekey(ctx context.Context, md *RootMetadata, promp
 	if !incKeyGen {
 		// See if there is at least one new device in relation to the
 		// current key bundle
-		rDkim, wDkim, err := md.bareMd.GetUserDeviceKeyInfoMaps(currKeyGen, nil, nil)
+		// MDv3 TODO: pass key bundles
+		rDkim, wDkim, err := md.bareMd.GetUserDeviceKeyInfoMaps(currKeyGen, nil)
 		if err != nil {
 			return false, nil, err
 		}
@@ -594,7 +595,8 @@ func (km *KeyManagerStandard) Rekey(ctx context.Context, md *RootMetadata, promp
 
 			// If there are readers that need to be promoted to writers, do
 			// that here.
-			rDkim, wDkim, err := md.bareMd.GetUserDeviceKeyInfoMaps(keyGen, nil, nil)
+			// MDv3 TODO: pass key bundles
+			rDkim, wDkim, err := md.bareMd.GetUserDeviceKeyInfoMaps(keyGen, nil)
 			if err != nil {
 				return false, nil, err
 			}
@@ -662,7 +664,7 @@ func (km *KeyManagerStandard) Rekey(ctx context.Context, md *RootMetadata, promp
 
 	// Delete server-side key halves for any revoked devices.
 	for keygen := KeyGen(FirstValidKeyGen); keygen <= currKeyGen; keygen++ {
-		rDkim, wDkim, err := md.bareMd.GetUserDeviceKeyInfoMaps(keygen, md.cachedWkb, md.cachedRkb)
+		rDkim, wDkim, err := md.bareMd.GetUserDeviceKeyInfoMaps(keygen, md.extra)
 		if err != nil {
 			return false, nil, err
 		}

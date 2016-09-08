@@ -82,6 +82,26 @@ type BareRootMetadataV3 struct {
 	codec.UnknownFieldSetHandler
 }
 
+// ExtraMetadataV3 contains references to key bundles stored outside of metadata
+// blocks.  This only ever exists in memory and is never serialized itself.
+type ExtraMetadataV3 struct {
+	wkb *TLFWriterKeyBundleV3
+	rkb *TLFReaderKeyBundle
+}
+
+// Helper function to extract key bundles for the ExtraMetadata interface.
+func getKeyBundlesV3(extra ExtraMetadata) (
+	*TLFWriterKeyBundleV3, *TLFReaderKeyBundle, bool) {
+	extraV3, ok := extra.(*ExtraMetadataV3)
+	if !ok {
+		return nil, nil, false
+	}
+	if extraV3.wkb == nil || extraV3.rkb == nil {
+		return nil, nil, false
+	}
+	return extraV3.wkb, extraV3.rkb, true
+}
+
 // TlfID implements the BareRootMetadata interface for BareRootMetadataV3.
 func (md *BareRootMetadataV3) TlfID() TlfID {
 	return md.WriterMetadata.ID
@@ -186,7 +206,7 @@ func (md *BareRootMetadataV3) IsFinal() bool {
 
 // IsWriter implements the BareRootMetadata interface for BareRootMetadataV3.
 func (md *BareRootMetadataV3) IsWriter(
-	user keybase1.UID, deviceKID keybase1.KID, wkb *TLFWriterKeyBundleV2) bool {
+	user keybase1.UID, deviceKID keybase1.KID, extra ExtraMetadata) bool {
 	if md.TlfID().IsPublic() {
 		for _, w := range md.WriterMetadata.Writers {
 			if w == user {
@@ -195,7 +215,8 @@ func (md *BareRootMetadataV3) IsWriter(
 		}
 		return false
 	}
-	if wkb == nil {
+	wkb, _, ok := getKeyBundlesV3(extra)
+	if !ok {
 		return false
 	}
 	return wkb.IsWriter(user, deviceKID)
@@ -203,11 +224,12 @@ func (md *BareRootMetadataV3) IsWriter(
 
 // IsReader implements the BareRootMetadata interface for BareRootMetadataV3.
 func (md *BareRootMetadataV3) IsReader(
-	user keybase1.UID, deviceKID keybase1.KID, rkb *TLFReaderKeyBundle) bool {
+	user keybase1.UID, deviceKID keybase1.KID, extra ExtraMetadata) bool {
 	if md.TlfID().IsPublic() {
 		return true
 	}
-	if rkb == nil {
+	_, rkb, ok := getKeyBundlesV3(extra)
+	if !ok {
 		return false
 	}
 	return rkb.IsReader(user, deviceKID)
@@ -351,20 +373,17 @@ func (md *BareRootMetadataV3) CheckValidSuccessorForServer(
 }
 
 // MakeBareTlfHandle implements the BareRootMetadata interface for BareRootMetadataV3.
-func (md *BareRootMetadataV3) MakeBareTlfHandle(wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) (
+func (md *BareRootMetadataV3) MakeBareTlfHandle(extra ExtraMetadata) (
 	BareTlfHandle, error) {
 	var writers, readers []keybase1.UID
 	if md.TlfID().IsPublic() {
 		writers = md.WriterMetadata.Writers
 		readers = []keybase1.UID{keybase1.PublicUID}
 	} else {
-		if rkb == nil {
-			return BareTlfHandle{}, errors.New("No reader key bundle")
+		wkb, rkb, ok := getKeyBundlesV3(extra)
+		if !ok {
+			return BareTlfHandle{}, errors.New("Missing key bundles")
 		}
-		if wkb == nil {
-			return BareTlfHandle{}, errors.New("No writer key bundle")
-		}
-
 		writers = make([]keybase1.UID, 0, len(wkb.Keys))
 		readers = make([]keybase1.UID, 0, len(rkb.RKeys))
 		for w := range wkb.Keys {
@@ -412,13 +431,10 @@ func (md *BareRootMetadataV3) GetTLFKeyBundles(_ KeyGen) (
 
 // GetDeviceKIDs implements the BareRootMetadata interface for BareRootMetadataV3.
 func (md *BareRootMetadataV3) GetDeviceKIDs(
-	keyGen KeyGen, user keybase1.UID, wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) (
-	[]keybase1.KID, error) {
-	if rkb == nil {
-		return nil, errors.New("Missing reader key bundle")
-	}
-	if wkb == nil {
-		return nil, errors.New("Missing writer key bundle")
+	keyGen KeyGen, user keybase1.UID, extra ExtraMetadata) ([]keybase1.KID, error) {
+	wkb, rkb, ok := getKeyBundlesV3(extra)
+	if !ok {
+		return nil, errors.New("Missing key bundles")
 	}
 	dkim := wkb.Keys[user]
 	if len(dkim) == 0 {
@@ -438,12 +454,9 @@ func (md *BareRootMetadataV3) GetDeviceKIDs(
 
 // HasKeyForUser implements the BareRootMetadata interface for BareRootMetadataV3.
 func (md *BareRootMetadataV3) HasKeyForUser(
-	keyGen KeyGen, user keybase1.UID,
-	wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) bool {
-	if rkb == nil {
-		return false
-	}
-	if wkb == nil {
+	keyGen KeyGen, user keybase1.UID, extra ExtraMetadata) bool {
+	wkb, rkb, ok := getKeyBundlesV3(extra)
+	if !ok {
 		return false
 	}
 	return (len(wkb.Keys[user]) > 0) || (len(rkb.RKeys[user]) > 0)
@@ -451,11 +464,11 @@ func (md *BareRootMetadataV3) HasKeyForUser(
 
 // GetTLFCryptKeyParams implements the BareRootMetadata interface for BareRootMetadataV3.
 func (md *BareRootMetadataV3) GetTLFCryptKeyParams(
-	keyGen KeyGen, user keybase1.UID, key CryptPublicKey,
-	wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) (
+	keyGen KeyGen, user keybase1.UID, key CryptPublicKey, extra ExtraMetadata) (
 	TLFEphemeralPublicKey, EncryptedTLFCryptKeyClientHalf,
 	TLFCryptKeyServerHalfID, bool, error) {
-	if rkb == nil || wkb == nil {
+	wkb, rkb, ok := getKeyBundlesV3(extra)
+	if !ok {
 		return TLFEphemeralPublicKey{},
 			EncryptedTLFCryptKeyClientHalf{},
 			TLFCryptKeyServerHalfID{}, false, errors.New("Missing key bundles")
@@ -501,18 +514,15 @@ func (md *BareRootMetadataV3) GetTLFCryptKeyParams(
 
 // IsValidAndSigned implements the BareRootMetadata interface for BareRootMetadataV3.
 func (md *BareRootMetadataV3) IsValidAndSigned(
-	codec Codec, crypto cryptoPure, wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) error {
+	codec Codec, crypto cryptoPure, extra ExtraMetadata) error {
 	// Optimization -- if the WriterMetadata signature is nil, it
 	// will fail verification.
 	if md.WriterMetadataSigInfo.IsNil() {
 		return errors.New("Missing WriterMetadata signature")
 	}
-
-	if rkb == nil {
-		return errors.New("Missing reader key bundle")
-	}
-	if wkb == nil {
-		return errors.New("Missing writer key bundle")
+	_, _, ok := getKeyBundlesV3(extra)
+	if !ok {
+		return errors.New("Missing key bundles")
 	}
 
 	if md.IsFinal() {
@@ -554,7 +564,7 @@ func (md *BareRootMetadataV3) IsValidAndSigned(
 			md.BID(), md.MergedStatus())
 	}
 
-	handle, err := md.MakeBareTlfHandle(wkb, rkb)
+	handle, err := md.MakeBareTlfHandle(extra)
 	if err != nil {
 		return err
 	}
@@ -779,8 +789,8 @@ func (md *BareRootMetadataV3) AddNewKeys(wkb TLFWriterKeyBundle, rkb TLFReaderKe
 
 // NewKeyGeneration implements the MutableBareRootMetadata interface for BareRootMetadataV3.
 func (md *BareRootMetadataV3) NewKeyGeneration(pubKey TLFPublicKey) (
-	wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) {
-	newWriterKeys := &TLFWriterKeyBundleV2{
+	extra ExtraMetadata) {
+	newWriterKeys := &TLFWriterKeyBundleV3{
 		Keys: make(UserDeviceKeyInfoMap),
 	}
 	newReaderKeys := &TLFReaderKeyBundle{
@@ -788,7 +798,10 @@ func (md *BareRootMetadataV3) NewKeyGeneration(pubKey TLFPublicKey) (
 	}
 	newWriterKeys.TLFPublicKeys = []TLFPublicKey{pubKey}
 	md.WriterMetadata.LatestKeyGen++
-	return newWriterKeys, newReaderKeys
+	return &ExtraMetadataV3{
+		rkb: newReaderKeys,
+		wkb: newWriterKeys,
+	}
 }
 
 // SetUnresolvedReaders implements the MutableBareRootMetadata interface for BareRootMetadataV3.
@@ -833,11 +846,11 @@ func (md *BareRootMetadataV3) Version() MetadataVer {
 
 // FakeInitialRekey implements the MutableBareRootMetadata interface for BareRootMetadataV3.
 func (md *BareRootMetadataV3) FakeInitialRekey(codec Codec, h BareTlfHandle) (
-	*TLFWriterKeyBundleV2, *TLFReaderKeyBundle, error) {
+	ExtraMetadata, error) {
 	if md.TlfID().IsPublic() {
 		panic("Called FakeInitialRekey on public TLF")
 	}
-	wkb := &TLFWriterKeyBundleV2{
+	wkb := &TLFWriterKeyBundleV3{
 		Keys: make(UserDeviceKeyInfoMap),
 	}
 	for _, w := range h.Writers {
@@ -848,11 +861,11 @@ func (md *BareRootMetadataV3) FakeInitialRekey(codec Codec, h BareTlfHandle) (
 	}
 	buf, err := codec.Encode(wkb)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	md.WriterMetadata.WKeyBundleID, err = TLFWriterKeyBundleIDFromBytes(buf)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	rkb := &TLFReaderKeyBundle{
 		RKeys: make(UserDeviceKeyInfoMap),
@@ -865,30 +878,35 @@ func (md *BareRootMetadataV3) FakeInitialRekey(codec Codec, h BareTlfHandle) (
 	}
 	buf, err = codec.Encode(rkb)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	md.RKeyBundleID, err = TLFReaderKeyBundleIDFromBytes(buf)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	md.WriterMetadata.LatestKeyGen++
-	return wkb, rkb, nil
+	return &ExtraMetadataV3{
+		rkb: rkb,
+		wkb: wkb,
+	}, nil
 }
 
 // GetTLFPublicKey implements the BareRootMetadata interface for BareRootMetadataV3.
-func (md *BareRootMetadataV3) GetTLFPublicKey(keyGen KeyGen, wkb *TLFWriterKeyBundleV2) (
+func (md *BareRootMetadataV3) GetTLFPublicKey(keyGen KeyGen, extra ExtraMetadata) (
 	TLFPublicKey, bool) {
 	if keyGen > md.LatestKeyGeneration() {
 		return TLFPublicKey{}, false
 	}
-	if wkb == nil {
+	wkb, _, ok := getKeyBundlesV3(extra)
+	if !ok {
 		return TLFPublicKey{}, false
 	}
 	return wkb.TLFPublicKeys[keyGen], true
 }
 
 // AreKeyGenerationsEqual implements the BareRootMetadata interface for BareRootMetadataV3.
-func (md *BareRootMetadataV3) AreKeyGenerationsEqual(codec Codec, other BareRootMetadata) (bool, error) {
+func (md *BareRootMetadataV3) AreKeyGenerationsEqual(
+	codec Codec, other BareRootMetadata) (bool, error) {
 	md3, ok := other.(*BareRootMetadataV3)
 	if !ok {
 		// MDv3 TODO: handle comparisons across versions
@@ -905,18 +923,16 @@ func (md *BareRootMetadataV3) GetUnresolvedParticipants() (readers, writers []ke
 }
 
 // GetUserDeviceKeyInfoMaps implements the MutableBareRootMetadata interface for BareRootMetadataV3.
-func (md *BareRootMetadataV3) GetUserDeviceKeyInfoMaps(keyGen KeyGen,
-	wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) (
+func (md *BareRootMetadataV3) GetUserDeviceKeyInfoMaps(keyGen KeyGen, extra ExtraMetadata) (
 	readers, writers UserDeviceKeyInfoMap, err error) {
 	if md.TlfID().IsPublic() {
 		return nil, nil, InvalidPublicTLFOperation{md.TlfID(), "GetTLFKeyBundles"}
 	}
-
 	if keyGen != md.LatestKeyGeneration() {
 		return nil, nil, InvalidKeyGenerationError{md.TlfID(), keyGen}
 	}
-
-	if rkb == nil || wkb == nil {
+	wkb, rkb, ok := getKeyBundlesV3(extra)
+	if !ok {
 		return nil, nil, errors.New("Key bundles missing")
 	}
 	return rkb.RKeys, wkb.Keys, nil
@@ -924,7 +940,7 @@ func (md *BareRootMetadataV3) GetUserDeviceKeyInfoMaps(keyGen KeyGen,
 
 // fillInDevices implements the MutableBareRootMetadata interface for BareRootMetadataV3.
 func (md *BareRootMetadataV3) fillInDevices(crypto Crypto,
-	_ *TLFWriterKeyBundle, wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle,
+	_ *TLFWriterKeyBundle, wkb *TLFWriterKeyBundleV3, rkb *TLFReaderKeyBundle,
 	wKeys map[keybase1.UID][]CryptPublicKey,
 	rKeys map[keybase1.UID][]CryptPublicKey, ePubKey TLFEphemeralPublicKey,
 	ePrivKey TLFEphemeralPrivateKey, tlfCryptKey TLFCryptKey) (

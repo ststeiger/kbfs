@@ -145,7 +145,7 @@ func (md *MDOpsStandard) processMetadata(ctx context.Context,
 	ImmutableRootMetadata, error) {
 	// First, verify validity and signatures.
 	// MDv3 TODO: pass key bundles
-	err := rmds.IsValidAndSigned(md.config.Codec(), md.config.Crypto(), nil, nil)
+	err := rmds.IsValidAndSigned(md.config.Codec(), md.config.Crypto(), nil)
 	if err != nil {
 		return ImmutableRootMetadata{}, MDMismatchError{
 			rmds.MD.RevisionNumber(), handle.GetCanonicalPath(),
@@ -223,7 +223,7 @@ func (md *MDOpsStandard) GetForHandle(ctx context.Context, handle *TlfHandle,
 	}
 
 	// MDv3 TODO: pass key bunldes when needed
-	bareMdHandle, err := rmds.MD.MakeBareTlfHandle(nil, nil)
+	bareMdHandle, err := rmds.MD.MakeBareTlfHandle(nil)
 	if err != nil {
 		return TlfID{}, ImmutableRootMetadata{}, err
 	}
@@ -316,7 +316,7 @@ func (md *MDOpsStandard) getForTLF(ctx context.Context, id TlfID,
 		return ImmutableRootMetadata{}, nil
 	}
 	// MDv3 TODO: pass key bundle when needed
-	bareHandle, err := rmds.MD.MakeBareTlfHandle(nil, nil)
+	bareHandle, err := rmds.MD.MakeBareTlfHandle(nil)
 	if err != nil {
 		return ImmutableRootMetadata{}, err
 	}
@@ -368,7 +368,7 @@ func (md *MDOpsStandard) processRange(ctx context.Context, id TlfID,
 		defer wg.Done()
 		for rmds := range rmdsChan {
 			// MDv3 TODO: pass key bundles when needed
-			bareHandle, err := rmds.MD.MakeBareTlfHandle(nil, nil)
+			bareHandle, err := rmds.MD.MakeBareTlfHandle(nil)
 			if err != nil {
 				select {
 				case errChan <- err:
@@ -524,7 +524,7 @@ func (md *MDOpsStandard) put(
 		return MdID{}, err
 	}
 
-	err = md.config.MDServer().Put(ctx, &rmds, rmd.cachedWkb, rmd.cachedRkb)
+	err = md.config.MDServer().Put(ctx, &rmds, rmd.extra)
 	if err != nil {
 		return MdID{}, err
 	}

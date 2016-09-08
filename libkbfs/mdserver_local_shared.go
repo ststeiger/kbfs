@@ -15,8 +15,8 @@ import (
 // access TLF metadata. mergedMasterHead can be nil, in which case
 // true is returned.
 func isReader(currentUID keybase1.UID, mergedMasterHead BareRootMetadata,
-	wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) (bool, error) {
-	h, err := mergedMasterHead.MakeBareTlfHandle(wkb, rkb)
+	extra ExtraMetadata) (bool, error) {
+	h, err := mergedMasterHead.MakeBareTlfHandle(extra)
 	if err != nil {
 		return false, err
 	}
@@ -29,7 +29,7 @@ func isReader(currentUID keybase1.UID, mergedMasterHead BareRootMetadata,
 func isWriterOrValidRekey(codec Codec, currentUID keybase1.UID,
 	mergedMasterHead, newMd BareRootMetadata) (bool, error) {
 	// MDv3 TODO: pass actual key bundles
-	h, err := mergedMasterHead.MakeBareTlfHandle(nil, nil)
+	h, err := mergedMasterHead.MakeBareTlfHandle(nil)
 	if err != nil {
 		return false, err
 	}

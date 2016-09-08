@@ -620,7 +620,7 @@ func (j *tlfJournal) flushOneMDOp(
 	j.log.CDebugf(ctx, "Flushing MD for TLF=%s with id=%s, rev=%s, bid=%s",
 		rmds.MD.TlfID(), mdID, rmds.MD.RevisionNumber(), rmds.MD.BID())
 	// MDv3 TODO: pass actual key bundles
-	pushErr := mdServer.Put(ctx, rmds, nil, nil)
+	pushErr := mdServer.Put(ctx, rmds, nil)
 	if isRevisionConflict(pushErr) {
 		headMdID, err := getMdID(ctx, mdServer, j.mdJournal.crypto,
 			rmds.MD.TlfID(), rmds.MD.BID(), rmds.MD.MergedStatus(),
@@ -649,7 +649,7 @@ func (j *tlfJournal) flushOneMDOp(
 			j.log.CDebugf(ctx, "Flushing newly-unmerged MD for TLF=%s with id=%s, rev=%s, bid=%s",
 				rmds.MD.TlfID(), mdID, rmds.MD.RevisionNumber(), rmds.MD.BID())
 			// MDv3 TODO: pass actual key bundles
-			pushErr = mdServer.Put(ctx, rmds, nil, nil)
+			pushErr = mdServer.Put(ctx, rmds, nil)
 		}
 	}
 	if pushErr != nil {
@@ -863,7 +863,7 @@ func (j *tlfJournal) getMDHead(
 	}
 
 	// MDv3 TODO: pass actual key bundles
-	return j.mdJournal.getHead(uid, key, nil, nil)
+	return j.mdJournal.getHead(uid, key, nil)
 }
 
 func (j *tlfJournal) getMDRange(
@@ -882,7 +882,7 @@ func (j *tlfJournal) getMDRange(
 	}
 
 	// MDv3 TODO: pass actual key bundles
-	return j.mdJournal.getRange(uid, key, nil, nil, start, stop)
+	return j.mdJournal.getRange(uid, key, nil, start, stop)
 }
 
 func (j *tlfJournal) putMD(ctx context.Context, rmd *RootMetadata) (
@@ -929,7 +929,7 @@ func (j *tlfJournal) clearMDs(ctx context.Context, bid BranchID) error {
 
 	// No need to signal work in this case.
 	// MDv3 TODO: pass actual key bundles
-	return j.mdJournal.clear(ctx, uid, key, bid, nil, nil)
+	return j.mdJournal.clear(ctx, uid, key, bid, nil)
 }
 
 func (j *tlfJournal) wait(ctx context.Context) error {

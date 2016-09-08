@@ -191,7 +191,7 @@ func putMDForPrivate(config *ConfigMock, rmd *RootMetadata) {
 	config.mockCrypto.EXPECT().Sign(gomock.Any(), gomock.Any()).Times(2).Return(SignatureInfo{}, nil)
 	config.mockBsplit.EXPECT().ShouldEmbedBlockChanges(gomock.Any()).
 		Return(true)
-	config.mockMdserv.EXPECT().Put(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	config.mockMdserv.EXPECT().Put(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 }
 
 func TestMDOpsGetForHandlePublicSuccess(t *testing.T) {
@@ -559,7 +559,7 @@ type fakeMDServerPut struct {
 }
 
 func (s *fakeMDServerPut) Put(ctx context.Context, rmds *RootMetadataSigned,
-	_ *TLFWriterKeyBundleV2, _ *TLFReaderKeyBundle) error {
+	_ ExtraMetadata) error {
 	s.lastRmdsLock.Lock()
 	defer s.lastRmdsLock.Unlock()
 	s.lastRmds = rmds

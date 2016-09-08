@@ -74,7 +74,7 @@ func TestMDServerBasics(t *testing.T) {
 		rmds := makeRMDSForTest(t, id, h, i, uid, prevRoot)
 		signRMDSForTest(t, config.Codec(), config.Crypto(), rmds)
 		// MDv3 TODO: pass actual key bundles
-		err = mdServer.Put(ctx, rmds, nil, nil)
+		err = mdServer.Put(ctx, rmds, nil)
 		require.NoError(t, err)
 		prevRoot, err = config.Crypto().MakeMdID(rmds.MD)
 		require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestMDServerBasics(t *testing.T) {
 	rmds = makeRMDSForTest(t, id, h, 10, uid, prevRoot)
 	signRMDSForTest(t, config.Codec(), config.Crypto(), rmds)
 	// MDv3 TODO: pass actual key bundles
-	err = mdServer.Put(ctx, rmds, nil, nil)
+	err = mdServer.Put(ctx, rmds, nil)
 	require.IsType(t, MDServerErrorConflictRevision{}, err)
 
 	// (4) push some new unmerged metadata blocks linking to the
@@ -101,7 +101,7 @@ func TestMDServerBasics(t *testing.T) {
 		rmds.MD.SetBranchID(bid)
 		signRMDSForTest(t, config.Codec(), config.Crypto(), rmds)
 		// MDv3 TODO: pass actual key bundles
-		err = mdServer.Put(ctx, rmds, nil, nil)
+		err = mdServer.Put(ctx, rmds, nil)
 		require.NoError(t, err)
 		prevRoot, err = config.Crypto().MakeMdID(rmds.MD)
 		require.NoError(t, err)

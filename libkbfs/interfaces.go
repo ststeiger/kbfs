@@ -1001,9 +1001,8 @@ type MDServer interface {
 	// Put stores the (signed/encrypted) metadata object for the given
 	// top-level folder. Note: If the unmerged bit is set in the metadata
 	// block's flags bitmask it will be appended to the unmerged per-device
-	// history. Note "wkb" and "rkb" are expected to be nil for pre-v3 metadata.
-	Put(ctx context.Context, rmds *RootMetadataSigned,
-		wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) error
+	// history.
+	Put(ctx context.Context, rmds *RootMetadataSigned, extra ExtraMetadata) error
 
 	// PruneBranch prunes all unmerged history for the given TLF branch.
 	PruneBranch(ctx context.Context, id TlfID, bid BranchID) error
@@ -1505,11 +1504,9 @@ type BareRootMetadata interface {
 	// folder.  This is only expected to be set for folder resets.
 	IsFinal() bool
 	// IsWriter returns whether or not the user+device is an authorized writer.
-	// Note "wkb" is expected to be nil for pre-v3 metadata.
-	IsWriter(user keybase1.UID, deviceKID keybase1.KID, wkb *TLFWriterKeyBundleV2) bool
+	IsWriter(user keybase1.UID, deviceKID keybase1.KID, extra ExtraMetadata) bool
 	// IsReader returns whether or not the user+device is an authorized reader.
-	// Note "rkb" is expected to be nil for pre-v3 metadata.
-	IsReader(user keybase1.UID, deviceKID keybase1.KID, rkb *TLFReaderKeyBundle) bool
+	IsReader(user keybase1.UID, deviceKID keybase1.KID, extra ExtraMetadata) bool
 	// DeepCopy returns a deep copy of the underlying data structure.
 	DeepCopy(codec Codec) (BareRootMetadata, error)
 	// MakeSuccessor returns a newly constructed successor to this metadata revision.
@@ -1522,34 +1519,28 @@ type BareRootMetadata interface {
 	CheckValidSuccessorForServer(currID MdID, nextMd BareRootMetadata) error
 	// MakeBareTlfHandle makes a BareTlfHandle for this
 	// BareRootMetadata. Should be used only by servers and MDOps.
-	// Note "wkb" and "rkb" are expected to be nil for pre-v3 metadata.
-	MakeBareTlfHandle(wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) (
-		BareTlfHandle, error)
+	MakeBareTlfHandle(extra ExtraMetadata) (BareTlfHandle, error)
 	// TlfHandleExtensions returns a list of handle extensions associated with the TLf.
 	TlfHandleExtensions() (extensions []TlfHandleExtension)
 	// GetDeviceKIDs returns the KIDs (of CryptPublicKeys) for all known
 	// devices for the given user at the given key generation, if any.
 	// Returns an error if the TLF is public, or if the given key
 	// generation is invalid.
-	// Note "wkb" and "rkb" are expected to be nil for pre-v3 metadata.
-	GetDeviceKIDs(keyGen KeyGen, user keybase1.UID,
-		wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) ([]keybase1.KID, error)
+	GetDeviceKIDs(keyGen KeyGen, user keybase1.UID, extra ExtraMetadata) (
+		[]keybase1.KID, error)
 	// HasKeyForUser returns whether or not the given user has keys for at
 	// least one device at the given key generation. Returns false if the
 	// TLF is public, or if the given key generation is invalid. Equivalent to:
 	//
 	//   kids, err := GetDeviceKIDs(keyGen, user)
 	//   return (err == nil) && (len(kids) > 0)
-	// Note "wkb" and "rkb" are expected to be nil for pre-v3 metadata.
-	HasKeyForUser(keyGen KeyGen, user keybase1.UID,
-		wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) bool
+	HasKeyForUser(keyGen KeyGen, user keybase1.UID, extra ExtraMetadata) bool
 	// GetTLFCryptKeyParams returns all the necessary info to construct
 	// the TLF crypt key for the given key generation, user, and device
 	// (identified by its crypt public key), or false if not found. This
 	// returns an error if the TLF is public.
-	// Note "wkb" and "rkb" are expected to be nil for pre-v3 metadata.
 	GetTLFCryptKeyParams(keyGen KeyGen, user keybase1.UID, key CryptPublicKey,
-		wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) (
+		extra ExtraMetadata) (
 		TLFEphemeralPublicKey, EncryptedTLFCryptKeyClientHalf,
 		TLFCryptKeyServerHalfID, bool, error)
 	// IsValidAndSigned verifies the BareRootMetadata, checks the
@@ -1559,9 +1550,7 @@ type BareRootMetadata interface {
 	// user and key should be validated, either by comparing to
 	// the current device key (using IsLastModifiedBy), or by
 	// checking with KBPKI.
-	// Note "wkb" and "rkb" are expected to be nil for pre-v3 metadata.
-	IsValidAndSigned(codec Codec, crypto cryptoPure,
-		wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) error
+	IsValidAndSigned(codec Codec, crypto cryptoPure, extra ExtraMetadata) error
 	// IsLastModifiedBy verifies that the BareRootMetadata is
 	// written by the given user and device (identified by the KID
 	// of the device verifying key), and returns an error if not.
@@ -1595,8 +1584,8 @@ type BareRootMetadata interface {
 	// Version returns the metadata version.
 	Version() MetadataVer
 	// GetTLFPublicKey returns the TLF public key for the give key generation.
-	// Note the *TLFWriterKeyBundleV2 is expected to be nil for pre-v3 metadata.
-	GetTLFPublicKey(KeyGen, *TLFWriterKeyBundleV2) (TLFPublicKey, bool)
+	// Note the *TLFWriterKeyBundleV3 is expected to be nil for pre-v3 metadata.
+	GetTLFPublicKey(KeyGen, ExtraMetadata) (TLFPublicKey, bool)
 	// AreKeyGenerationsEqual returns true if all key generations in the passed metadata are equal to those
 	// in this revision.
 	AreKeyGenerationsEqual(Codec, BareRootMetadata) (bool, error)
@@ -1651,7 +1640,7 @@ type MutableBareRootMetadata interface {
 	// AddNewKeys adds new writer and reader TLF key bundles to this revision of metadata.
 	AddNewKeys(wkb TLFWriterKeyBundle, rkb TLFReaderKeyBundle)
 	// NewKeyGeneration adds a new key generation to this revision of metadata.
-	NewKeyGeneration(pubKey TLFPublicKey) (wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle)
+	NewKeyGeneration(pubKey TLFPublicKey) (extra ExtraMetadata)
 	// SetUnresolvedReaders sets the list of unresolved readers assoiated with this folder.
 	SetUnresolvedReaders(readers []keybase1.SocialAssertion)
 	// SetUnresolvedWriters sets the list of unresolved writers assoiated with this folder.
@@ -1668,7 +1657,7 @@ type MutableBareRootMetadata interface {
 	// BareRootMetadata. This is necessary since newly-created
 	// BareRootMetadata objects don't have enough data to build a
 	// TlfHandle from until the first rekey.
-	FakeInitialRekey(c Codec, h BareTlfHandle) (*TLFWriterKeyBundleV2, *TLFReaderKeyBundle, error)
+	FakeInitialRekey(c Codec, h BareTlfHandle) (ExtraMetadata, error)
 	// Update initializes the given freshly-created BareRootMetadata object with
 	// the given TlfID and BareTlfHandle. Note that if the given ID/handle are private,
 	// rekeying must be done separately.
@@ -1677,9 +1666,9 @@ type MutableBareRootMetadata interface {
 	// Returns the TLF key bundles for this metadata at the given key generation.
 	GetTLFKeyBundles(keyGen KeyGen) (*TLFWriterKeyBundle, *TLFReaderKeyBundle, error)
 	// GetUserDeviceKeyInfoMaps returns the given user device key info maps for the given
-	// key generation. Note "wkb" and "rkb" are expcted to be nil for pre-v3 metadata.
-	GetUserDeviceKeyInfoMaps(keyGen KeyGen, wkb *TLFWriterKeyBundleV2,
-		rkb *TLFReaderKeyBundle) (readers, writers UserDeviceKeyInfoMap, err error)
+	// key generation.
+	GetUserDeviceKeyInfoMaps(keyGen KeyGen, extra ExtraMetadata) (
+		readers, writers UserDeviceKeyInfoMap, err error)
 	// fillInDevices ensures that every device for every writer and reader
 	// in the provided lists has complete TLF crypt key info, and uses the
 	// new ephemeral key pair to generate the info if it doesn't yet
@@ -1687,7 +1676,7 @@ type MutableBareRootMetadata interface {
 	// Note "wkb" is expcted to be nil for post-v3 metadata and "wkb2" is expected to be
 	// nil for pre-v3 metadata.
 	fillInDevices(crypto Crypto,
-		wkb *TLFWriterKeyBundle, wkb2 *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle,
+		wkb *TLFWriterKeyBundle, wkb2 *TLFWriterKeyBundleV3, rkb *TLFReaderKeyBundle,
 		wKeys map[keybase1.UID][]CryptPublicKey,
 		rKeys map[keybase1.UID][]CryptPublicKey, ePubKey TLFEphemeralPublicKey,
 		ePrivKey TLFEphemeralPrivateKey, tlfCryptKey TLFCryptKey) (serverKeyMap, error)
@@ -1697,10 +1686,10 @@ type MutableBareRootMetadata interface {
 type KeyBundleCache interface {
 	// GetTLFReaderKeyBundle returns the TLFReaderKeyBundle for the given TLFReaderKeyBundleID.
 	GetTLFReaderKeyBundle(TLFReaderKeyBundleID) (TLFReaderKeyBundle, bool)
-	// GetTLFWriterKeyBundle returns the TLFWriterKeyBundleV2 for the given TLFWriterKeyBundleID.
-	GetTLFWriterKeyBundle(TLFWriterKeyBundleID) (TLFWriterKeyBundleV2, bool)
+	// GetTLFWriterKeyBundle returns the TLFWriterKeyBundleV3 for the given TLFWriterKeyBundleID.
+	GetTLFWriterKeyBundle(TLFWriterKeyBundleID) (TLFWriterKeyBundleV3, bool)
 	// PutTLFReaderKeyBundle stores the given TLFReaderKeyBundle.
 	PutTLFReaderKeyBundle(TLFReaderKeyBundle)
-	// PutTLFWriterKeyBundle stores the given TLFWriterKeyBundleV2.
-	PutTLFWriterKeyBundle(TLFWriterKeyBundleV2)
+	// PutTLFWriterKeyBundle stores the given TLFWriterKeyBundleV3.
+	PutTLFWriterKeyBundle(TLFWriterKeyBundleV3)
 }

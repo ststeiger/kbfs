@@ -11,9 +11,9 @@ import (
 	"github.com/keybase/go-codec/codec"
 )
 
-// TLFWriterKeyBundleV2 is a bundle of writer keys and historic symmetric encryption
+// TLFWriterKeyBundleV3 is a bundle of writer keys and historic symmetric encryption
 // keys for a top-level folder.
-type TLFWriterKeyBundleV2 struct {
+type TLFWriterKeyBundleV3 struct {
 	// Maps from each user to their crypt key bundle for the current generation.
 	Keys UserDeviceKeyInfoMap
 
@@ -37,7 +37,7 @@ type TLFWriterKeyBundleV2 struct {
 }
 
 // IsWriter returns true if the given user device is in the device set.
-func (wkb TLFWriterKeyBundleV2) IsWriter(user keybase1.UID, deviceKID keybase1.KID) bool {
+func (wkb TLFWriterKeyBundleV3) IsWriter(user keybase1.UID, deviceKID keybase1.KID) bool {
 	_, ok := wkb.Keys[user][deviceKID]
 	return ok
 }

@@ -152,7 +152,7 @@ func (md *MDServerMemory) GetForHandle(ctx context.Context, handle BareTlfHandle
 
 func (md *MDServerMemory) checkGetParams(
 	ctx context.Context, id TlfID, bid BranchID, mStatus MergeStatus,
-	rkb *TLFReaderKeyBundle, wkb *TLFWriterKeyBundleV2) (newBid BranchID, err error) {
+	extra ExtraMetadata) (newBid BranchID, err error) {
 	if mStatus == Merged && bid != NullBranchID {
 		return NullBranchID, MDServerErrorBadRequest{Reason: "Invalid branch ID"}
 	}
@@ -172,7 +172,7 @@ func (md *MDServerMemory) checkGetParams(
 
 	// TODO: Figure out nil case.
 	if mergedMasterHead != nil {
-		ok, err := isReader(currentUID, mergedMasterHead.MD, wkb, rkb)
+		ok, err := isReader(currentUID, mergedMasterHead.MD, extra)
 		if err != nil {
 			return NullBranchID, MDServerError{err}
 		}
@@ -193,7 +193,7 @@ func (md *MDServerMemory) checkGetParams(
 func (md *MDServerMemory) GetForTLF(ctx context.Context, id TlfID,
 	bid BranchID, mStatus MergeStatus) (*RootMetadataSigned, error) {
 	// MDv3 TODO: pass actual key bundles
-	bid, err := md.checkGetParams(ctx, id, bid, mStatus, nil, nil)
+	bid, err := md.checkGetParams(ctx, id, bid, mStatus, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +270,7 @@ func (md *MDServerMemory) GetRange(ctx context.Context, id TlfID,
 	[]*RootMetadataSigned, error) {
 	md.log.CDebugf(ctx, "GetRange %d %d (%s)", start, stop, mStatus)
 	// MDv3 TODO: pass actual key bundles
-	bid, err := md.checkGetParams(ctx, id, bid, mStatus, nil, nil)
+	bid, err := md.checkGetParams(ctx, id, bid, mStatus, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +328,7 @@ func (md *MDServerMemory) GetRange(ctx context.Context, id TlfID,
 
 // Put implements the MDServer interface for MDServerMemory.
 func (md *MDServerMemory) Put(ctx context.Context, rmds *RootMetadataSigned,
-	wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) error {
+	extra ExtraMetadata) error {
 
 	currentUID, currentVerifyingKey, err :=
 		getCurrentUIDAndVerifyingKey(ctx, md.config.currentInfoGetter())
@@ -336,7 +336,7 @@ func (md *MDServerMemory) Put(ctx context.Context, rmds *RootMetadataSigned,
 		return MDServerError{err}
 	}
 
-	err = rmds.IsValidAndSigned(md.config.Codec(), md.config.cryptoPure(), wkb, rkb)
+	err = rmds.IsValidAndSigned(md.config.Codec(), md.config.cryptoPure(), extra)
 	if err != nil {
 		return MDServerErrorBadRequest{Reason: err.Error()}
 	}

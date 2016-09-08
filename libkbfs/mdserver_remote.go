@@ -460,7 +460,7 @@ func (md *MDServerRemote) GetRange(ctx context.Context, id TlfID,
 
 // Put implements the MDServer interface for MDServerRemote.
 func (md *MDServerRemote) Put(ctx context.Context, rmds *RootMetadataSigned,
-	_ *TLFWriterKeyBundleV2, _ *TLFReaderKeyBundle) error {
+	extra ExtraMetadata) error {
 	// encode MD block
 	rmdsBytes, err := md.config.Codec().Encode(rmds)
 	if err != nil {

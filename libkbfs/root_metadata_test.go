@@ -509,7 +509,7 @@ func TestIsValidRekeyRequestBasic(t *testing.T) {
 
 	// Replace with copied signature.
 	newRmd.SetWriterMetadataSigInfo(sigInfo)
-	// MDv3 TODO: pass readerkey bundles
+	// MDv3 TODO: pass reader key bundles
 	ok, err = newRmd.bareMd.IsValidRekeyRequest(
 		config.Codec(), rmd.bareMd, newRmd.LastModifyingWriter(), nil, nil)
 	if err != nil {
@@ -674,7 +674,7 @@ func TestRootMetadataFinalVerify(t *testing.T) {
 
 	// verify it
 	// MDv3 TODO: pass key bundles
-	err = rmds.IsValidAndSigned(config.Codec(), config.Crypto(), nil, nil)
+	err = rmds.IsValidAndSigned(config.Codec(), config.Crypto(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -694,7 +694,7 @@ func TestRootMetadataFinalVerify(t *testing.T) {
 
 	// verify the finalized copy
 	// MDv3 TODO: pass key bundles
-	err = rmds2.IsValidAndSigned(config.Codec(), config.Crypto(), nil, nil)
+	err = rmds2.IsValidAndSigned(config.Codec(), config.Crypto(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -703,7 +703,7 @@ func TestRootMetadataFinalVerify(t *testing.T) {
 	// and verify verification failure.
 	rmds2.MD.SetRekeyBit()
 	// MDv3 TODO: pass key bundles
-	err = rmds2.IsValidAndSigned(config.Codec(), config.Crypto(), nil, nil)
+	err = rmds2.IsValidAndSigned(config.Codec(), config.Crypto(), nil)
 	if err == nil {
 		t.Fatalf("expected error")
 	}

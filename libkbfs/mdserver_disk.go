@@ -360,7 +360,7 @@ func (md *MDServerDisk) GetRange(ctx context.Context, id TlfID,
 
 // Put implements the MDServer interface for MDServerDisk.
 func (md *MDServerDisk) Put(ctx context.Context, rmds *RootMetadataSigned,
-	wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) error {
+	extra ExtraMetadata) error {
 
 	currentUID, currentVerifyingKey, err :=
 		getCurrentUIDAndVerifyingKey(ctx, md.config.currentInfoGetter())

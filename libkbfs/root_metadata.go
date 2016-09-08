@@ -90,6 +90,10 @@ func (p PrivateMetadata) ChangesBlockInfo() BlockInfo {
 	return p.cachedChanges.Info
 }
 
+// ExtraMetadata is a per-version blob of extra metadata which may exist outside of the
+// given metadata block, e.g. key bundles for post-v2 metadata.
+type ExtraMetadata interface{}
+
 // A RootMetadata is a BareRootMetadata but with a deserialized
 // PrivateMetadata. However, note that it is possible that the
 // PrivateMetadata has to be left serialized due to not having the
@@ -107,9 +111,9 @@ type RootMetadata struct {
 	// deserialized (more common on the server side).
 	tlfHandle *TlfHandle
 
-	// Cached key bundles when using v3 metadata.
-	cachedWkb *TLFWriterKeyBundleV2
-	cachedRkb *TLFReaderKeyBundle
+	// ExtraMetadata currently contains key bundles for post-v2
+	// metadata.
+	extra ExtraMetadata
 }
 
 var _ KeyMetadata = (*RootMetadata)(nil)
@@ -248,7 +252,7 @@ func (md *RootMetadata) MakeBareTlfHandle() (BareTlfHandle, error) {
 		panic(errors.New("MakeBareTlfHandle called when md.tlfHandle exists"))
 	}
 
-	return md.bareMd.MakeBareTlfHandle(md.cachedWkb, md.cachedRkb)
+	return md.bareMd.MakeBareTlfHandle(md.extra)
 }
 
 // IsInitialized returns whether or not this RootMetadata has been initialized
@@ -328,7 +332,7 @@ func (md *RootMetadata) updateFromTlfHandle(newHandle *TlfHandle) error {
 	md.SetConflictInfo(newHandle.ConflictInfo())
 	md.SetFinalizedInfo(newHandle.FinalizedInfo())
 
-	bareHandle, err := md.bareMd.MakeBareTlfHandle(md.cachedWkb, md.cachedRkb)
+	bareHandle, err := md.bareMd.MakeBareTlfHandle(md.extra)
 	if err != nil {
 		return err
 	}
@@ -364,7 +368,7 @@ func (md *RootMetadata) GetTLFCryptKeyParams(
 	keyGen KeyGen, user keybase1.UID, key CryptPublicKey) (
 	TLFEphemeralPublicKey, EncryptedTLFCryptKeyClientHalf,
 	TLFCryptKeyServerHalfID, bool, error) {
-	return md.bareMd.GetTLFCryptKeyParams(keyGen, user, key, md.cachedWkb, md.cachedRkb)
+	return md.bareMd.GetTLFCryptKeyParams(keyGen, user, key, md.extra)
 }
 
 // LatestKeyGeneration wraps the respective method of the underlying BareRootMetadata for convenience.
@@ -587,13 +591,13 @@ func (md *RootMetadata) SetTlfID(tlf TlfID) {
 
 // HasKeyForUser wraps the respective method of the underlying BareRootMetadata for convenience.
 func (md *RootMetadata) HasKeyForUser(keyGen KeyGen, user keybase1.UID) bool {
-	return md.bareMd.HasKeyForUser(keyGen, user, md.cachedWkb, md.cachedRkb)
+	return md.bareMd.HasKeyForUser(keyGen, user, md.extra)
 }
 
 // FakeInitialRekey wraps the respective method of the underlying BareRootMetadata for convenience.
 func (md *RootMetadata) FakeInitialRekey(codec Codec, h BareTlfHandle) error {
 	var err error
-	md.cachedWkb, md.cachedRkb, err = md.bareMd.FakeInitialRekey(codec, h)
+	md.extra, err = md.bareMd.FakeInitialRekey(codec, h)
 	return err
 }
 
@@ -609,7 +613,7 @@ func (md *RootMetadata) GetBareRootMetadata() BareRootMetadata {
 
 // NewKeyGeneration adds a new key generation to this revision of metadata.
 func (md *RootMetadata) NewKeyGeneration(pubKey TLFPublicKey) {
-	md.cachedWkb, md.cachedRkb = md.bareMd.NewKeyGeneration(pubKey)
+	md.extra = md.bareMd.NewKeyGeneration(pubKey)
 }
 
 func (md *RootMetadata) fillInDevices(crypto Crypto,
@@ -620,8 +624,8 @@ func (md *RootMetadata) fillInDevices(crypto Crypto,
 	var wkb *TLFWriterKeyBundle
 
 	// v3 bundles aren't embedded.
-	wkb2, rkb := md.cachedWkb, md.cachedRkb
-	if wkb2 == nil {
+	wkb2, rkb, ok := getKeyBundlesV3(md.extra)
+	if !ok {
 		// v1 & v2 bundles are embedded.
 		wkb, rkb, err = md.bareMd.GetTLFKeyBundles(keyGen)
 		if err != nil {
@@ -770,14 +774,14 @@ func (rmds *RootMetadataSigned) MakeFinalCopy(config Config) (
 // validated, either by comparing to the current device key (using
 // IsLastModifiedBy), or by checking with KBPKI.
 func (rmds *RootMetadataSigned) IsValidAndSigned(
-	codec Codec, crypto cryptoPure, wkb *TLFWriterKeyBundleV2, rkb *TLFReaderKeyBundle) error {
+	codec Codec, crypto cryptoPure, extra ExtraMetadata) error {
 	// Optimization -- if the RootMetadata signature is nil, it
 	// will fail verification.
 	if rmds.SigInfo.IsNil() {
 		return errors.New("Missing RootMetadata signature")
 	}
 
-	err := rmds.MD.IsValidAndSigned(codec, crypto, wkb, rkb)
+	err := rmds.MD.IsValidAndSigned(codec, crypto, extra)
 	if err != nil {
 		return err
 	}
