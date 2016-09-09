@@ -140,3 +140,50 @@ func TestJournalQRSimple(t *testing.T) {
 		),
 	)
 }
+
+// bob rekeys for charlie while journaling, but gets converted to a
+// conflict branch so the rekey fails.
+func TestJournalRekeyErrorAfterConflict(t *testing.T) {
+	test(t, journal(),
+		users("alice", "bob", "charlie"),
+		inPrivateTlf("alice,bob,charlie@twitter"),
+		as(alice,
+			mkfile("a", "hello"),
+		),
+		as(bob,
+			enableJournal(),
+			mkfile("b", "hello2"),
+			read("a", "hello"),
+			read("b", "hello2"),
+			disableUpdates(),
+		),
+		as(alice,
+			// Cause conflict with bob.
+			mkfile("c", "hello3"),
+		),
+		as(bob, noSync(),
+			pauseJournal(),
+			mkfile("d", "hello4"),
+		),
+		addNewAssertion("charlie", "charlie@twitter"),
+		as(bob, noSync(),
+			resumeJournal(),
+			expectError(rekey(), "Conflict during a rekey, not retrying"),
+			reenableUpdates(),
+		),
+		as(charlie,
+			expectError(initRoot(), "MDServer Unauthorized"),
+		),
+		as(alice,
+			rekey(),
+		),
+		inPrivateTlfNonCanonical("alice,bob,charlie@twitter",
+			"alice,bob,charlie"),
+		as(charlie,
+			read("a", "hello"),
+			read("b", "hello2"),
+			read("c", "hello3"),
+			read("d", "hello4"),
+		),
+	)
+}
