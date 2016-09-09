@@ -228,7 +228,7 @@ func (md *RootMetadata) MakeSuccessor(
 // AddNewKeys makes a new key generation for this RootMetadata using the
 // given TLF key bundles.
 func (md *RootMetadata) AddNewKeys(
-	wkb TLFWriterKeyBundle, rkb TLFReaderKeyBundle) error {
+	wkb TLFWriterKeyBundleV2, rkb TLFReaderKeyBundleV2) error {
 	if md.TlfID().IsPublic() {
 		return InvalidPublicTLFOperation{md.TlfID(), "AddNewKeys"}
 	}
@@ -621,7 +621,7 @@ func (md *RootMetadata) fillInDevices(crypto Crypto,
 	rKeys map[keybase1.UID][]CryptPublicKey, ePubKey TLFEphemeralPublicKey,
 	ePrivKey TLFEphemeralPrivateKey, tlfCryptKey TLFCryptKey) (serverKeyMap, error) {
 	var err error
-	var wkb *TLFWriterKeyBundle
+	var wkb *TLFWriterKeyBundleV2
 
 	// v3 bundles aren't embedded.
 	wkb2, rkb, ok := getKeyBundlesV3(md.extra)

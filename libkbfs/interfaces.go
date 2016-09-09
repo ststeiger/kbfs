@@ -1491,7 +1491,7 @@ type BareRootMetadata interface {
 	// IsValidRekeyRequest returns true if the current block is a simple rekey wrt
 	// the passed block. Note "prevRkb" and "rkb" are expected to be nil for pre-v3 metadata.
 	IsValidRekeyRequest(codec Codec, prevMd BareRootMetadata,
-		user keybase1.UID, prevRkb, rkb *TLFReaderKeyBundle) (bool, error)
+		user keybase1.UID, prevRkb, rkb *TLFReaderKeyBundleV2) (bool, error)
 	// MergedStatus returns the status of this update -- has it been
 	// merged into the main folder or not?
 	MergedStatus() MergeStatus
@@ -1638,7 +1638,7 @@ type MutableBareRootMetadata interface {
 	// SetRevision sets the revision number of the underlying metadata.
 	SetRevision(revision MetadataRevision)
 	// AddNewKeys adds new writer and reader TLF key bundles to this revision of metadata.
-	AddNewKeys(wkb TLFWriterKeyBundle, rkb TLFReaderKeyBundle)
+	AddNewKeys(wkb TLFWriterKeyBundleV2, rkb TLFReaderKeyBundleV2)
 	// NewKeyGeneration adds a new key generation to this revision of metadata.
 	NewKeyGeneration(pubKey TLFPublicKey) (extra ExtraMetadata)
 	// SetUnresolvedReaders sets the list of unresolved readers assoiated with this folder.
@@ -1664,7 +1664,7 @@ type MutableBareRootMetadata interface {
 	// Update implements the BareRootMetadata interface for BareRootMetadataV2.
 	Update(tlf TlfID, h BareTlfHandle) error
 	// Returns the TLF key bundles for this metadata at the given key generation.
-	GetTLFKeyBundles(keyGen KeyGen) (*TLFWriterKeyBundle, *TLFReaderKeyBundle, error)
+	GetTLFKeyBundles(keyGen KeyGen) (*TLFWriterKeyBundleV2, *TLFReaderKeyBundleV2, error)
 	// GetUserDeviceKeyInfoMaps returns the given user device key info maps for the given
 	// key generation.
 	GetUserDeviceKeyInfoMaps(keyGen KeyGen, extra ExtraMetadata) (
@@ -1676,7 +1676,7 @@ type MutableBareRootMetadata interface {
 	// Note "wkb" is expcted to be nil for post-v3 metadata and "wkb2" is expected to be
 	// nil for pre-v3 metadata.
 	fillInDevices(crypto Crypto,
-		wkb *TLFWriterKeyBundle, wkb2 *TLFWriterKeyBundleV3, rkb *TLFReaderKeyBundle,
+		wkb *TLFWriterKeyBundleV2, wkb2 *TLFWriterKeyBundleV3, rkb *TLFReaderKeyBundleV2,
 		wKeys map[keybase1.UID][]CryptPublicKey,
 		rKeys map[keybase1.UID][]CryptPublicKey, ePubKey TLFEphemeralPublicKey,
 		ePrivKey TLFEphemeralPrivateKey, tlfCryptKey TLFCryptKey) (serverKeyMap, error)
@@ -1684,12 +1684,12 @@ type MutableBareRootMetadata interface {
 
 // KeyBundleCache is an interface to a key bundle cache for use with v3 metadata.
 type KeyBundleCache interface {
-	// GetTLFReaderKeyBundle returns the TLFReaderKeyBundle for the given TLFReaderKeyBundleID.
-	GetTLFReaderKeyBundle(TLFReaderKeyBundleID) (TLFReaderKeyBundle, bool)
-	// GetTLFWriterKeyBundle returns the TLFWriterKeyBundleV3 for the given TLFWriterKeyBundleID.
-	GetTLFWriterKeyBundle(TLFWriterKeyBundleID) (TLFWriterKeyBundleV3, bool)
-	// PutTLFReaderKeyBundle stores the given TLFReaderKeyBundle.
-	PutTLFReaderKeyBundle(TLFReaderKeyBundle)
-	// PutTLFWriterKeyBundle stores the given TLFWriterKeyBundleV3.
-	PutTLFWriterKeyBundle(TLFWriterKeyBundleV3)
+	// GetTLFReaderKeyBundleV2 returns the TLFReaderKeyBundleV2 for the given TLFReaderKeyBundleID.
+	GetTLFReaderKeyBundleV2(TLFReaderKeyBundleID) (TLFReaderKeyBundleV2, bool)
+	// GetTLFWriterKeyBundleV2 returns the TLFWriterKeyBundleV3 for the given TLFWriterKeyBundleID.
+	GetTLFWriterKeyBundleV2(TLFWriterKeyBundleID) (TLFWriterKeyBundleV3, bool)
+	// PutTLFReaderKeyBundleV2 stores the given TLFReaderKeyBundleV2.
+	PutTLFReaderKeyBundleV2(TLFReaderKeyBundleV2)
+	// PutTLFWriterKeyBundleV2 stores the given TLFWriterKeyBundleV3.
+	PutTLFWriterKeyBundleV2(TLFWriterKeyBundleV3)
 }
