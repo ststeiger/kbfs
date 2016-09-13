@@ -11,6 +11,11 @@ import (
 	"github.com/keybase/go-codec/codec"
 )
 
+// TLFReaderKeyBundleV3 is an alias to a TLFReaderKeyBundleV2 for clarity.
+type TLFReaderKeyBundleV3 struct {
+	TLFReaderKeyBundleV2
+}
+
 // TLFWriterKeyBundleV3 is a bundle of writer keys and historic symmetric encryption
 // keys for a top-level folder.
 type TLFWriterKeyBundleV3 struct {

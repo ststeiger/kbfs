@@ -140,7 +140,7 @@ func (md *BareRootMetadataV2) haveOnlyUserRKeysChanged(
 
 // IsValidRekeyRequest implements the BareRootMetadata interface for BareRootMetadataV2.
 func (md *BareRootMetadataV2) IsValidRekeyRequest(
-	codec Codec, prevBareMd BareRootMetadata, user keybase1.UID, _, _ *TLFReaderKeyBundleV2) (
+	codec Codec, prevBareMd BareRootMetadata, user keybase1.UID, _, _ ExtraMetadata) (
 	bool, error) {
 	if !md.IsWriterMetadataCopiedSet() {
 		// Not a copy.
@@ -948,7 +948,8 @@ func (md *BareRootMetadataV2) NewKeyGeneration(pubKey TLFPublicKey) ExtraMetadat
 
 // fillInDevices implements the MutableBareRootMetadata interface for BareRootMetadataV2.
 func (md *BareRootMetadataV2) fillInDevices(crypto Crypto,
-	wkb *TLFWriterKeyBundleV2, _ *TLFWriterKeyBundleV3, rkb *TLFReaderKeyBundleV2,
+	wkb *TLFWriterKeyBundleV2, _ *TLFWriterKeyBundleV3,
+	rkb *TLFReaderKeyBundleV2, _ *TLFReaderKeyBundleV3,
 	wKeys map[keybase1.UID][]CryptPublicKey,
 	rKeys map[keybase1.UID][]CryptPublicKey, ePubKey TLFEphemeralPublicKey,
 	ePrivKey TLFEphemeralPrivateKey, tlfCryptKey TLFCryptKey) (

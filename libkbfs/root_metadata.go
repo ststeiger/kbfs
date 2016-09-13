@@ -622,9 +622,10 @@ func (md *RootMetadata) fillInDevices(crypto Crypto,
 	ePrivKey TLFEphemeralPrivateKey, tlfCryptKey TLFCryptKey) (serverKeyMap, error) {
 	var err error
 	var wkb *TLFWriterKeyBundleV2
+	var rkb *TLFReaderKeyBundleV2
 
 	// v3 bundles aren't embedded.
-	wkb2, rkb, ok := getKeyBundlesV3(md.extra)
+	wkb2, rkb2, ok := getKeyBundlesV3(md.extra)
 	if !ok {
 		// v1 & v2 bundles are embedded.
 		wkb, rkb, err = md.bareMd.GetTLFKeyBundles(keyGen)
@@ -634,7 +635,7 @@ func (md *RootMetadata) fillInDevices(crypto Crypto,
 	}
 
 	return md.bareMd.fillInDevices(crypto,
-		wkb, wkb2, rkb, wKeys, rKeys,
+		wkb, wkb2, rkb, rkb2, wKeys, rKeys,
 		ePubKey, ePrivKey, tlfCryptKey)
 }
 

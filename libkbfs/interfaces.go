@@ -1491,7 +1491,7 @@ type BareRootMetadata interface {
 	// IsValidRekeyRequest returns true if the current block is a simple rekey wrt
 	// the passed block. Note "prevRkb" and "rkb" are expected to be nil for pre-v3 metadata.
 	IsValidRekeyRequest(codec Codec, prevMd BareRootMetadata,
-		user keybase1.UID, prevRkb, rkb *TLFReaderKeyBundleV2) (bool, error)
+		user keybase1.UID, prevExtra, extra ExtraMetadata) (bool, error)
 	// MergedStatus returns the status of this update -- has it been
 	// merged into the main folder or not?
 	MergedStatus() MergeStatus
@@ -1675,8 +1675,10 @@ type MutableBareRootMetadata interface {
 	// exist.
 	// Note "wkb" is expcted to be nil for post-v3 metadata and "wkb2" is expected to be
 	// nil for pre-v3 metadata.
+	// MDv3 TODO: get rid of this.
 	fillInDevices(crypto Crypto,
-		wkb *TLFWriterKeyBundleV2, wkb2 *TLFWriterKeyBundleV3, rkb *TLFReaderKeyBundleV2,
+		wkb *TLFWriterKeyBundleV2, wkb2 *TLFWriterKeyBundleV3,
+		rkb *TLFReaderKeyBundleV2, rkb2 *TLFReaderKeyBundleV3,
 		wKeys map[keybase1.UID][]CryptPublicKey,
 		rKeys map[keybase1.UID][]CryptPublicKey, ePubKey TLFEphemeralPublicKey,
 		ePrivKey TLFEphemeralPrivateKey, tlfCryptKey TLFCryptKey) (serverKeyMap, error)
@@ -1685,11 +1687,11 @@ type MutableBareRootMetadata interface {
 // KeyBundleCache is an interface to a key bundle cache for use with v3 metadata.
 type KeyBundleCache interface {
 	// GetTLFReaderKeyBundleV2 returns the TLFReaderKeyBundleV2 for the given TLFReaderKeyBundleID.
-	GetTLFReaderKeyBundleV2(TLFReaderKeyBundleID) (TLFReaderKeyBundleV2, bool)
+	GetTLFReaderKeyBundleV2(TLFReaderKeyBundleID) (TLFReaderKeyBundleV3, bool)
 	// GetTLFWriterKeyBundleV2 returns the TLFWriterKeyBundleV3 for the given TLFWriterKeyBundleID.
 	GetTLFWriterKeyBundleV2(TLFWriterKeyBundleID) (TLFWriterKeyBundleV3, bool)
 	// PutTLFReaderKeyBundleV2 stores the given TLFReaderKeyBundleV2.
-	PutTLFReaderKeyBundleV2(TLFReaderKeyBundleV2)
+	PutTLFReaderKeyBundleV2(TLFReaderKeyBundleV3)
 	// PutTLFWriterKeyBundleV2 stores the given TLFWriterKeyBundleV3.
 	PutTLFWriterKeyBundleV2(TLFWriterKeyBundleV3)
 }

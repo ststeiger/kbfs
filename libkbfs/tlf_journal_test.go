@@ -776,7 +776,7 @@ type orderedMDServer struct {
 }
 
 func (s *orderedMDServer) Put(
-	ctx context.Context, rmds *RootMetadataSigned) error {
+	ctx context.Context, rmds *RootMetadataSigned, _ ExtraMetadata) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	*s.puts = append(*s.puts, rmds.MD.RevisionNumber())
