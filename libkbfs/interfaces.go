@@ -1638,6 +1638,7 @@ type MutableBareRootMetadata interface {
 	// SetRevision sets the revision number of the underlying metadata.
 	SetRevision(revision MetadataRevision)
 	// AddNewKeys adds new writer and reader TLF key bundles to this revision of metadata.
+	// MDv3 TODO: Get rid of this.
 	AddNewKeys(wkb TLFWriterKeyBundleV2, rkb TLFReaderKeyBundleV2)
 	// NewKeyGeneration adds a new key generation to this revision of metadata.
 	NewKeyGeneration(pubKey TLFPublicKey) (extra ExtraMetadata)
@@ -1664,6 +1665,7 @@ type MutableBareRootMetadata interface {
 	// Update implements the BareRootMetadata interface for BareRootMetadataV2.
 	Update(tlf TlfID, h BareTlfHandle) error
 	// Returns the TLF key bundles for this metadata at the given key generation.
+	// MDv3 TODO: Get rid of this.
 	GetTLFKeyBundles(keyGen KeyGen) (*TLFWriterKeyBundleV2, *TLFReaderKeyBundleV2, error)
 	// GetUserDeviceKeyInfoMaps returns the given user device key info maps for the given
 	// key generation.

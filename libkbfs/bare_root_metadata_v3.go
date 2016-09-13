@@ -56,6 +56,9 @@ type BareRootMetadataV3 struct {
 	WriterMetadata WriterMetadataV3 `codec:"wmd"`
 	// The signature for the writer metadata, to prove
 	// that it's only been changed by writers.
+	// MDv3 TODO: It would be better for journaling if we could move this
+	// to RootMetadataSigned since it references metadata by ID. We could
+	// then delay computing it until sending metadata to the server.
 	WriterMetadataSigInfo SignatureInfo `codec:"wmdsi"`
 
 	// The last KB user who modified this BareRootMetadata
